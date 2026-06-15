@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WPAudet</title>
+    <link rel="stylesheet" href="popup.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="glass-container">
+        <header>
+            <div class="header-top">
+                <div class="logo-wrapper">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                            <path
+                                d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM12 4C13.41 4 14.73 4.37 15.88 5.01L13.11 12.63L11.05 18.29C10.15 17.44 9.15 16.5 8.12 15.65L5.75 11.35C6.9 8.23 9.77 6 12 4ZM12 20C10.59 20 9.27 19.63 8.12 18.99L10.89 11.37L12.95 5.71C13.85 6.56 14.85 7.5 15.88 8.35L18.25 12.65C17.1 15.77 14.23 18 12 20Z"
+                                fill="currentColor" />
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <h1>WPAudet</h1>
+                        <span class="badge-idn">Indo Made</span>
+                    </div>
+                </div>
+                <button id="btn-settings" class="icon-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main id="app">
+            <div id="loading" class="state-container">
+                <div class="spinner"></div>
+                <p>Menganalisis situs...</p>
+            </div>
+
+            <div id="no-wp" class="state-container hidden">
+                <div class="empty-icon">x</div>
+                <p>Bukan situs WordPress</p>
+            </div>
+
+            <div id="audit-screen" class="hidden">
+                <div class="audit-list">
+                    <div class="audit-item" id="audit-core">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Mendeteksi Teknologi</span>
+                    </div>
+                    <div class="audit-item" id="audit-performance">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Memeriksa Performa</span>
+                    </div>
+                    <div class="audit-item" id="audit-seo">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Menganalisis SEO</span>
+                    </div>
+                    <div class="audit-item" id="audit-security">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Memindai Keamanan</span>
+                    </div>
+                    <div class="audit-item" id="audit-accessibility">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Review Aksesibilitas</span>
+                    </div>
+                    <div class="audit-item" id="audit-mobile">
+                        <div class="audit-dot"></div>
+                        <span class="audit-label">Optimalisasi Mobile</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="results" class="hidden">
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Tema Aktif</h2>
+                        <button class="btn-copy" data-copy="theme" title="Copy Theme Info">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+                                fill="none">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card premium-card">
+                        <div class="theme-details">
+                            <h3 id="theme-name">...</h3>
+                            <div class="meta-row">
+                                <span class="label">Versi:</span>
+                                <span id="theme-version" class="value highlight">...</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Plugin Terdeteksi (<span id="plugin-count">0</span>)</h2>
+                    </div>
+                    <div id="plugin-list" class="plugin-flex">
+                        <!-- Plugins will be injected here -->
+                    </div>
+                </section>
+
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Keyword Intelligence</h2>
+                    </div>
+                    <div class="card glass-card">
+                        <div class="keyword-block">
+                            <span class="label">Keyword Terdeteksi</span>
+                            <div id="keyword-list" class="tag-cloud">
+                                <!-- Keywords will be injected here -->
+                            </div>
+                        </div>
+                        <div class="keyword-block">
+                            <span class="label">Saran Keyword AI</span>
+                            <div id="ai-keyword-list" class="tag-cloud">
+                                <!-- AI Keywords will be injected here -->
+                            </div>
+                        </div>
+                        <div class="keyword-block-border">
+                            <span class="label">Traffic Insights (Eksternal)</span>
+                            <div class="traffic-buttons">
+                                <button id="check-semrush" class="insight-btn-mini">SEMrush</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Ringkasan Audit</h2>
+                    </div>
+                    <div class="card glass-card">
+                        <div class="row">
+                            <span class="label">SEO Health</span>
+                            <span id="audit-seo-val" class="value">...</span>
+                        </div>
+                        <div class="row">
+                            <span class="label">Aksesibilitas</span>
+                            <span id="audit-acc-val" class="value">...</span>
+                        </div>
+                        <div class="row">
+                            <span class="label">Keamanan</span>
+                            <span id="audit-sec-val" class="value">...</span>
+                        </div>
+                        <div class="row">
+                            <span class="label">Mobile Ready</span>
+                            <span id="audit-mob-val" class="value">...</span>
+                        </div>
+                        <div class="row extra-margin">
+                            <button id="btn-audit-detail" class="link-btn">Detail Audit</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Rewriter AI</h2>
+                        <button id="btn-rewrite" class="primary-btn-mini">Rewrite Artikel</button>
+                    </div>
+                    <div id="rewriter-result" class="card glass-card hidden">
+                        <div class="ai-box">
+                            <h4 id="rewrite-title">Judul Baru</h4>
+                            <div id="rewrite-body" class="ai-content">
+                                Menyiapkan artikel...
+                            </div>
+                            <button id="btn-copy-rewrite" class="link-btn-mini">Copy Artikel</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="info-group">
+                    <div class="section-header">
+                        <h2>Detail Server</h2>
+                        <button class="btn-copy" data-copy="server" title="Copy Server Info">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+                                fill="none">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card glass-card">
+                        <div class="row">
+                            <span class="label">IP Address</span>
+                            <span id="server-ip" class="value selectable">...</span>
+                        </div>
+                        <div class="row">
+                            <span class="label">Hosting</span>
+                            <div class="host-wrapper">
+                                <span id="server-hosting" class="value selectable">...</span>
+                                <span id="cdn-badge" class="badge-cdn hidden">CDN</span>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <span class="label">Lokasi</span>
+                            <span id="server-location" class="value selectable">...</span>
+                        </div>
+                        <div class="row">
+                            <span class="label">NS</span>
+                            <span id="server-ns" class="value selectable">...</span>
+                        </div>
+                        <div class="row extra-margin">
+                            <button id="btn-whois" class="link-btn">Detail WHOIS</button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+        <section class="support-section">
+            <div class="support-card">
+                <p class="support-text">Suka WPAudet? Traktir kopi!</p>
+                <div class="trakteer-wrapper">
+                    <a href="https://trakteer.id/bungrahman" target="_blank">
+                        <img id="wse-buttons-preview"
+                            src="https://edge-cdn.trakteer.id/images/embed/trbtn-red-1.png?v=14-05-2025" height="32"
+                            style="border:0px;height:32px;" alt="Trakteer Saya">
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="footer-content">
+                <span>v1.0.5</span>
+                <span class="dot">•</span>
+                <span>Buatan Anak Bangsa</span>
+            </div>
+        </footer>
+    </div>
+
+    <div id="toast" class="toast hidden">Copied to clipboard!</div>
+
+    <!-- WHOIS Modal -->
+    <div id="whois-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>WHOIS Detail</h3>
+                <button id="close-modal" class="close-btn">×</button>
+            </div>
+            <div id="whois-body" class="modal-body">
+                <pre id="whois-raw">Loading data...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Modal -->
+    <div id="audit-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Audit Detail</h3>
+                <button id="close-audit-modal" class="close-btn">×</button>
+            </div>
+            <div id="audit-body" class="modal-body">
+                <div id="audit-detail-content" class="audit-detail-grid">
+                    <!-- Dynamic content will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pengaturan API AI</h3>
+                <button id="close-settings" class="close-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <label>OpenAI</label>
+                    <div class="input-row">
+                        <input type="password" id="api-openai" placeholder="API Key (sk-...)">
+                        <input type="text" id="model-openai" placeholder="Model (cth: gpt-4o)">
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>Google Gemini</label>
+                    <div class="input-row">
+                        <input type="password" id="api-google" placeholder="API Key (AIza...)">
+                        <input type="text" id="model-google" placeholder="Model (cth: gemini-1.5-flash)">
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>GROQ</label>
+                    <div class="input-row">
+                        <input type="password" id="api-groq" placeholder="API Key (gsk_...)">
+                        <input type="text" id="model-groq" placeholder="Model (cth: llama-3.1-70b-versatile)">
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>DeepSeek</label>
+                    <div class="input-row">
+                        <input type="password" id="api-deepseek" placeholder="API Key (ds-...)">
+                        <input type="text" id="model-deepseek" placeholder="Model (cth: deepseek-chat)">
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>Pilih Provider Aktif</label>
+                    <select id="ai-provider">
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="groq">GROQ</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                </div>
+                <button id="btn-save-settings" class="primary-btn">Simpan Pengaturan</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

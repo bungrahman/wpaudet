@@ -1,0 +1,20 @@
+=== Upgrade Notice ===
+
+= 1.0.5 =
+Major Update: Traffic Intelligence & Universal WHOIS.
+This update introduces significant improvements to domain analysis and AI capabilities.
+
+**HIGHLIGHTS:**
+*   **SEMrush Integration**: Direct traffic analysis link for professional insights.
+*   **Multi-TLD WHOIS**: Fixed "404 Error" on .id, .org, and .net domains. Now supports almost all TLDs.
+*   **AI Traffic Potential**: Keyword suggestions now come with [HIGH/MEDIUM/LOW] traffic estimates.
+*   **Smart Cache**: Saves your AI token usage by caching results per tab.
+
+**IMPORTANT FOR EXISTING USERS:**
+Because this update adds new server permissions (RDAP/WHOIS servers) to `manifest.json`, Chrome will NOT auto-update the extension code in memory.
+**YOU MUST RELOAD THE EXTENSION MANUALLY:**
+1. Go to `chrome://extensions/`
+2. Find WPAudet.
+3. Click the Reload (🔄) button.
+
+If you don't do this, WHOIS features might show errors.
