@@ -4,40 +4,93 @@ document.addEventListener('DOMContentLoaded', async () => {
     const results = document.getElementById('results');
     const themeName = document.getElementById('theme-name');
     const themeVersion = document.getElementById('theme-version');
-    const pluginList = document.getElementById('plugin-list');
-    const pluginCount = document.getElementById('plugin-count');
     const toast = document.getElementById('toast');
 
-    // Get current active tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    // Get current active tab dynamically
+    let tab = null;
 
+    async function getActiveTab() {
+        const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (activeTab) {
+            tab = activeTab;
+        } else {
+            const [fallbackTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            tab = fallbackTab;
+        }
+        return tab;
+    }
+
+    await getActiveTab();
     if (!tab) return;
 
-    // Fetch data from storage
-    chrome.storage.local.get(`tab_${tab.id}`, async (data) => {
-        let wpData = data[`tab_${tab.id}`];
+    // ==================== TAB NAVIGATION ====================
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
 
-        if (!wpData || !wpData.isWP) {
-            loading.classList.add('hidden');
-            noWp.classList.remove('hidden');
-            results.classList.add('hidden');
-            return;
-        }
-
-        // START AUDIT SEQUENCE
-        loading.classList.add('hidden');
-        const auditScreen = document.getElementById('audit-screen');
-        auditScreen.classList.remove('hidden');
-
-        await runAuditSequence();
-
-        // Re-fetch data in case it was updated during the artificial delay
-        chrome.storage.local.get(`tab_${tab.id}`, (newData) => {
-            wpData = newData[`tab_${tab.id}`] || wpData;
-            displayResults(wpData);
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanels.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(`tab-${targetTab}`)?.classList.add('active');
         });
     });
 
+    // ==================== LOAD DATA ====================
+    async function loadDataForCurrentTab() {
+        await getActiveTab();
+        if (!tab) return;
+
+        // Reset state UI
+        loading.classList.remove('hidden');
+        noWp.classList.add('hidden');
+        results.classList.add('hidden');
+        document.getElementById('audit-screen').classList.add('hidden');
+
+        chrome.storage.local.get(`tab_${tab.id}`, async (data) => {
+            let wpData = data[`tab_${tab.id}`];
+
+            if (!wpData || !wpData.isWP) {
+                loading.classList.add('hidden');
+                noWp.classList.remove('hidden');
+                results.classList.add('hidden');
+                // Still init URL display even if not WP
+                initGSCBingPanel(tab.url);
+                return;
+            }
+
+            // START AUDIT SEQUENCE
+            loading.classList.add('hidden');
+            const auditScreen = document.getElementById('audit-screen');
+            auditScreen.classList.remove('hidden');
+
+            await runAuditSequence();
+
+            // Re-fetch data in case it was updated during the artificial delay
+            chrome.storage.local.get(`tab_${tab.id}`, (newData) => {
+                wpData = newData[`tab_${tab.id}`] || wpData;
+                displayResults(wpData);
+            });
+        });
+    }
+
+    // Initial load
+    await loadDataForCurrentTab();
+
+    // Listen for tab activation changes (when user switches tabs in browser)
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+        await loadDataForCurrentTab();
+    });
+
+    // Listen for page refreshes/loads in the active tab
+    chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, updatedTab) => {
+        if (tab && tabId === tab.id && changeInfo.status === 'complete') {
+            await loadDataForCurrentTab();
+        }
+    });
+
+    // ==================== AUDIT ANIMATION ====================
     async function runAuditSequence() {
         const steps = [
             'audit-core',
@@ -52,18 +105,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const el = document.getElementById(stepId);
             if (!el) continue;
             el.classList.add('active');
-
-            // Artificial delay to mimic analysis
-            await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700));
-
+            await new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 600));
             el.classList.remove('active');
             el.classList.add('completed');
         }
 
-        // Final polish pause
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 400));
     }
 
+    // ==================== DISPLAY RESULTS ====================
     function displayResults(wpData) {
         const auditScreen = document.getElementById('audit-screen');
         auditScreen.classList.add('hidden');
@@ -84,22 +134,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             const audit = wpData.audit;
 
             const seoEl = document.getElementById('audit-seo-val');
-            seoEl.textContent = (audit.seo.hasTitle && audit.seo.hasDesc) ? 'Bagus' : 'Butuh Perbaikan';
+            seoEl.textContent = (audit.seo.hasTitle && audit.seo.hasDesc) ? 'Bagus ✓' : 'Butuh Perbaikan';
             seoEl.className = `value ${(audit.seo.hasTitle && audit.seo.hasDesc) ? 'success-text' : 'warning-text'}`;
 
             const accEl = document.getElementById('audit-acc-val');
-            accEl.textContent = audit.accessibility.imagesMissingAlt === 0 ? 'Optimal' : `${audit.accessibility.imagesMissingAlt} Masalah`;
+            accEl.textContent = audit.accessibility.imagesMissingAlt === 0 ? 'Optimal ✓' : `${audit.accessibility.imagesMissingAlt} Masalah`;
             accEl.className = `value ${audit.accessibility.imagesMissingAlt === 0 ? 'success-text' : 'warning-text'}`;
 
             const secEl = document.getElementById('audit-sec-val');
-            secEl.textContent = audit.security.isHttps ? 'Aman (HTTPS)' : 'Tidak Aman';
+            secEl.textContent = audit.security.isHttps ? 'Aman (HTTPS) ✓' : 'Tidak Aman';
             secEl.className = `value ${audit.security.isHttps ? 'success-text' : 'danger-text'}`;
 
             const mobEl = document.getElementById('audit-mob-val');
-            mobEl.textContent = audit.mobile.hasViewport ? 'Ya' : 'Tidak';
+            mobEl.textContent = audit.mobile.hasViewport ? 'Optimal ✓' : 'Tidak Ada';
             mobEl.className = `value ${audit.mobile.hasViewport ? 'success-text' : 'danger-text'}`;
         } else {
-            // Fallback if data is missing (e.g. old storage)
             ['audit-seo-val', 'audit-acc-val', 'audit-sec-val', 'audit-mob-val'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -130,6 +179,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             pluginList.appendChild(empty);
         }
 
+        // Schema
+        renderSchemaResult(wpData.schema);
+
         // Keywords
         const keywordList = document.getElementById('keyword-list');
         const aiKeywordList = document.getElementById('ai-keyword-list');
@@ -143,7 +195,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tag.textContent = kw;
                 keywordList.appendChild(tag);
             });
-            // Trigger AI keywords
             getAIKeywords(wpData);
         } else {
             keywordList.innerHTML = '<p class="empty-state">Tidak ada keyword terdeteksi.</p>';
@@ -169,12 +220,205 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize Insight Buttons
         initInsightButtons(tab.url);
 
+        // Init GSC & Bing Panel
+        initGSCBingPanel(tab.url);
+
         // Fetch Server Info
         fetchServerInfo(tab.url);
         fetchNameServers(tab.url);
     }
 
-    // Rewriter Logic
+    // ==================== SCHEMA RENDERER ====================
+    function renderSchemaResult(schemaTypes) {
+        const schemaResult = document.getElementById('schema-result');
+        if (!schemaResult) return;
+        schemaResult.innerHTML = '';
+
+        if (!schemaTypes || schemaTypes.length === 0) {
+            const badge = document.createElement('span');
+            badge.className = 'schema-badge none';
+            badge.textContent = 'Tidak terdeteksi';
+            schemaResult.appendChild(badge);
+            return;
+        }
+
+        schemaTypes.forEach(type => {
+            const badge = document.createElement('span');
+            const lowerType = type.toLowerCase();
+            let cls = 'schema-badge';
+            if (lowerType.includes('product') || lowerType.includes('offer')) cls += ' product';
+            else if (lowerType.includes('article') || lowerType.includes('news') || lowerType.includes('blog')) cls += ' article';
+            badge.className = cls;
+            badge.textContent = type;
+            schemaResult.appendChild(badge);
+        });
+    }
+
+    // ==================== GSC & BING PANEL ====================
+    function initGSCBingPanel(urlStr) {
+        let currentUrl = urlStr || (tab ? tab.url : '') || '';
+        let currentDomain = '';
+        try {
+            const urlObj = new URL(currentUrl);
+            currentDomain = urlObj.hostname.replace(/^www\./, '');
+        } catch (e) {
+            currentUrl = (tab ? tab.url : '') || '';
+            try {
+                const urlObj = new URL(currentUrl);
+                currentDomain = urlObj.hostname.replace(/^www\./, '');
+            } catch (err) {}
+        }
+
+        // Display current URL chip
+        const urlDisplay = document.getElementById('current-url-display');
+        if (urlDisplay) {
+            urlDisplay.textContent = currentUrl.length > 55 ? currentUrl.substring(0, 55) + '...' : currentUrl;
+            urlDisplay.title = currentUrl;
+        }
+
+        // Pre-fill URL input with current URL
+        const urlInput = document.getElementById('url-checker-input');
+        if (urlInput && currentUrl) {
+            urlInput.placeholder = currentUrl;
+        }
+
+        // ---- ONE-CLICK INDEX GSC ----
+        const btnGSCIndex = document.getElementById('btn-gsc-index');
+        if (btnGSCIndex) {
+            btnGSCIndex.onclick = () => {
+                chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+                    let targetUrl = (tabs && tabs[0]) ? tabs[0].url : currentUrl;
+                    if (!targetUrl) {
+                        chrome.tabs.query({ active: true, currentWindow: true }, (fallbackTabs) => {
+                            targetUrl = (fallbackTabs && fallbackTabs[0]) ? fallbackTabs[0].url : currentUrl;
+                            if (!targetUrl) return showToast('URL tidak valid');
+                            openGscInspect(targetUrl);
+                        });
+                    } else {
+                        openGscInspect(targetUrl);
+                    }
+                });
+            };
+        }
+
+        function openGscInspect(targetUrl) {
+            chrome.tabs.create({ url: 'https://search.google.com/search-console/' });
+            showToast('Membuka Google Search Console...');
+        }
+
+        // ---- ONE-CLICK INDEX BING ----
+        const btnBingIndex = document.getElementById('btn-bing-index');
+        if (btnBingIndex) {
+            btnBingIndex.onclick = () => {
+                chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+                    let targetUrl = (tabs && tabs[0]) ? tabs[0].url : currentUrl;
+                    if (!targetUrl) {
+                        chrome.tabs.query({ active: true, currentWindow: true }, (fallbackTabs) => {
+                            targetUrl = (fallbackTabs && fallbackTabs[0]) ? fallbackTabs[0].url : currentUrl;
+                            if (!targetUrl) return showToast('URL tidak valid');
+                            openBingSubmit(targetUrl);
+                        });
+                    } else {
+                        openBingSubmit(targetUrl);
+                    }
+                });
+            };
+        }
+
+        function openBingSubmit(targetUrl) {
+            chrome.tabs.create({ url: 'https://www.bing.com/webmasters/' });
+            showToast('Membuka Bing Webmaster Tools...');
+        }
+
+        // ---- GSC REPORT PERIODS ----
+        const reportBtns = document.querySelectorAll('.report-period-btn');
+        reportBtns.forEach(btn => {
+            btn.onclick = async () => {
+                const activeTab = await getActiveTab();
+                const targetUrl = activeTab?.url || currentUrl;
+                const months = parseInt(btn.getAttribute('data-months'));
+                openGSCReport(targetUrl, months);
+            };
+        });
+
+        // ---- URL INDEX CHECKER ----
+        const btnCheckGoogle = document.getElementById('btn-check-google');
+        const btnCheckBing = document.getElementById('btn-check-bing');
+        const btnCheckGoogleDomain = document.getElementById('btn-check-google-domain');
+        const btnCheckBingDomain = document.getElementById('btn-check-bing-domain');
+
+        if (btnCheckGoogle) {
+            btnCheckGoogle.onclick = async () => {
+                const activeTab = await getActiveTab();
+                const targetUrl = urlInput?.value.trim() || activeTab?.url || currentUrl;
+                if (!targetUrl) return showToast('Masukkan URL terlebih dahulu');
+                chrome.tabs.create({ url: `https://www.google.com/search?q=site:${encodeURIComponent(targetUrl)}` });
+            };
+        }
+
+        if (btnCheckBing) {
+            btnCheckBing.onclick = async () => {
+                const activeTab = await getActiveTab();
+                const targetUrl = urlInput?.value.trim() || activeTab?.url || currentUrl;
+                if (!targetUrl) return showToast('Masukkan URL terlebih dahulu');
+                chrome.tabs.create({ url: `https://www.bing.com/search?q=site:${encodeURIComponent(targetUrl)}` });
+            };
+        }
+
+        if (btnCheckGoogleDomain) {
+            btnCheckGoogleDomain.onclick = async () => {
+                const activeTab = await getActiveTab();
+                const targetUrl = activeTab?.url || currentUrl;
+                let targetDomain = currentDomain;
+                try {
+                    const urlObj = new URL(targetUrl);
+                    targetDomain = urlObj.hostname.replace(/^www\./, '');
+                } catch(e) {}
+                if (!targetDomain) return showToast('Domain tidak terdeteksi');
+                chrome.tabs.create({ url: `https://www.google.com/search?q=site:${encodeURIComponent(targetDomain)}` });
+            };
+        }
+
+        if (btnCheckBingDomain) {
+            btnCheckBingDomain.onclick = async () => {
+                const activeTab = await getActiveTab();
+                const targetUrl = activeTab?.url || currentUrl;
+                let targetDomain = currentDomain;
+                try {
+                    const urlObj = new URL(targetUrl);
+                    targetDomain = urlObj.hostname.replace(/^www\./, '');
+                } catch(e) {}
+                if (!targetDomain) return showToast('Domain tidak terdeteksi');
+                chrome.tabs.create({ url: `https://www.bing.com/search?q=site:${encodeURIComponent(targetDomain)}` });
+            };
+        }
+    }
+
+    // ==================== GSC REPORT OPENER ====================
+    function openGSCReport(siteUrl, months) {
+        const now = new Date();
+        const from = new Date();
+        from.setMonth(from.getMonth() - months);
+
+        const pad = n => String(n).padStart(2, '0');
+        const fmtDate = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+
+        const startDate = fmtDate(from);
+        const endDate = fmtDate(now);
+
+        // Try to get site root URL (strip path if it's an inner page)
+        let siteRoot = siteUrl;
+        try {
+            const u = new URL(siteUrl);
+            siteRoot = `${u.protocol}//${u.hostname}`;
+        } catch(e) {}
+
+        const gscReportUrl = `https://search.google.com/search-console/performance/search-analytics?resource_id=${encodeURIComponent(siteRoot)}&start_date=${startDate}&end_date=${endDate}`;
+        chrome.tabs.create({ url: gscReportUrl });
+        showToast(`Membuka Report GSC ${months} Bulan...`);
+    }
+
+    // ==================== REWRITER LOGIC ====================
     const rewriteBtn = document.getElementById('btn-rewrite');
     const rewriterResult = document.getElementById('rewriter-result');
     const rewriteTitle = document.getElementById('rewrite-title');
@@ -222,7 +466,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rewriteBody.textContent = response;
                 }
 
-                // Save to Cache
                 if (wpData) {
                     wpData.cache_rewrite = response;
                     saveTabCache(wpData);
@@ -241,7 +484,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         navigator.clipboard.writeText(text).then(() => showToast('Artikel disalin!'));
     });
 
-    // Audit Modal Logic
+    // ==================== AUDIT MODAL ====================
     const auditBtn = document.getElementById('btn-audit-detail');
     const auditModal = document.getElementById('audit-modal');
     const closeAuditModal = document.getElementById('close-audit-modal');
@@ -253,19 +496,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (wpData && wpData.audit) {
                 populateAuditModal(wpData.audit);
                 auditModal.classList.remove('hidden');
-                // Trigger AI suggestions AFTER modal is populated
                 getAISuggestions(wpData);
             }
         });
     });
 
-    closeAuditModal.addEventListener('click', () => {
-        auditModal.classList.add('hidden');
-    });
-
-    auditModal.addEventListener('click', (e) => {
-        if (e.target === auditModal) auditModal.classList.add('hidden');
-    });
+    closeAuditModal.addEventListener('click', () => auditModal.classList.add('hidden'));
+    auditModal.addEventListener('click', (e) => { if (e.target === auditModal) auditModal.classList.add('hidden'); });
 
     function populateAuditModal(audit) {
         auditBody.innerHTML = `
@@ -273,19 +510,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h4>SEO Health</h4>
                 <div class="audit-detail-row">
                     <span>Meta Title</span>
-                    <span class="${audit.seo.hasTitle ? 'success-text' : 'danger-text'}">${audit.seo.hasTitle ? 'Ditemukan' : 'Hilang'}</span>
+                    <span class="${audit.seo.hasTitle ? 'success-text' : 'danger-text'}">${audit.seo.hasTitle ? '✓ Ditemukan' : '✗ Hilang'}</span>
                 </div>
                 <div class="audit-detail-row">
                     <span>Meta Description</span>
-                    <span class="${audit.seo.hasDesc ? 'success-text' : 'danger-text'}">${audit.seo.hasDesc ? 'Ditemukan' : 'Hilang'}</span>
+                    <span class="${audit.seo.hasDesc ? 'success-text' : 'danger-text'}">${audit.seo.hasDesc ? '✓ Ditemukan' : '✗ Hilang'}</span>
                 </div>
                 <div class="audit-detail-row">
                     <span>Open Graph (OG)</span>
-                    <span class="${audit.seo.hasOG ? 'success-text' : 'danger-text'}">${audit.seo.hasOG ? 'Ditemukan' : 'Hilang'}</span>
+                    <span class="${audit.seo.hasOG ? 'success-text' : 'danger-text'}">${audit.seo.hasOG ? '✓ Ditemukan' : '✗ Hilang'}</span>
                 </div>
                 <div class="audit-detail-row">
                     <span>H1 Heading</span>
-                    <span class="${audit.seo.h1Count > 0 ? 'success-text' : 'danger-text'}">${audit.seo.h1Count} Found</span>
+                    <span class="${audit.seo.h1Count > 0 ? 'success-text' : 'danger-text'}">${audit.seo.h1Count} Ditemukan</span>
                 </div>
             </div>
 
@@ -309,11 +546,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h4>Aksesibilitas</h4>
                 <div class="audit-detail-row">
                     <span>Atribut Alt Gambar</span>
-                    <span class="${audit.accessibility.imagesMissingAlt === 0 ? 'success-text' : 'warning-text'}">${audit.accessibility.imagesMissingAlt === 0 ? 'Lengkap' : audit.accessibility.imagesMissingAlt + ' Masalah'}</span>
+                    <span class="${audit.accessibility.imagesMissingAlt === 0 ? 'success-text' : 'warning-text'}">${audit.accessibility.imagesMissingAlt === 0 ? '✓ Lengkap' : audit.accessibility.imagesMissingAlt + ' Masalah'}</span>
                 </div>
                 <div class="audit-detail-row">
                     <span>HTML Language Tag</span>
-                    <span class="${audit.accessibility.hasLang ? 'success-text' : 'danger-text'}">${audit.accessibility.hasLang ? 'Ada' : 'Hilang'}</span>
+                    <span class="${audit.accessibility.hasLang ? 'success-text' : 'danger-text'}">${audit.accessibility.hasLang ? '✓ Ada' : '✗ Hilang'}</span>
                 </div>
             </div>
 
@@ -321,7 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h4>Mobile Readiness</h4>
                 <div class="audit-detail-row">
                     <span>Viewport Meta</span>
-                    <span class="${audit.mobile.hasViewport ? 'success-text' : 'danger-text'}">${audit.mobile.hasViewport ? 'Optimal' : 'Tidak Ada'}</span>
+                    <span class="${audit.mobile.hasViewport ? 'success-text' : 'danger-text'}">${audit.mobile.hasViewport ? '✓ Optimal' : '✗ Tidak Ada'}</span>
                 </div>
             </div>
 
@@ -329,14 +566,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h4>Keamanan (Dasar)</h4>
                 <div class="audit-detail-row">
                     <span>HTTPS / SSL</span>
-                    <span class="${audit.security.isHttps ? 'success-text' : 'danger-text'}">${audit.security.isHttps ? 'Aktif' : 'Tidak Aktif'}</span>
+                    <span class="${audit.security.isHttps ? 'success-text' : 'danger-text'}">${audit.security.isHttps ? '✓ Aktif' : '✗ Tidak Aktif'}</span>
                 </div>
                 <div class="audit-detail-row">
                     <span>Login Marker</span>
                     <span class="value">${audit.security.hasHiddenLogin ? 'Terlihat' : 'Aman (Tersembunyi)'}</span>
                 </div>
             </div>
-            
+
             <div id="ai-audit-suggestions" class="audit-detail-item">
                 <div class="section-header">
                     <h4>Saran Perbaikan AI</h4>
@@ -351,7 +588,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
-        // Add Refresh Listener
         document.getElementById('refresh-ai-audit').addEventListener('click', () => {
             chrome.storage.local.get(`tab_${tab.id}`, (data) => {
                 const wpData = data[`tab_${tab.id}`];
@@ -360,13 +596,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // AI Logic Functions
+    // ==================== AI FUNCTIONS ====================
     async function getAISuggestions(wpData, force = false) {
         const audit = wpData.audit;
         const aiText = document.getElementById('ai-audit-text');
         if (!aiText) return;
 
-        // Check Cache
         if (!force && wpData.cache_suggestions) {
             aiText.textContent = wpData.cache_suggestions;
             aiText.classList.remove('loading-text');
@@ -385,7 +620,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                const prompt = `Analisis audit WordPress URl: ${wpData.url}.
+                const prompt = `Analisis audit WordPress URL: ${wpData.url}.
                 Data Audit:
                 SEO: ${JSON.stringify(audit.seo)}
                 Performa: ${JSON.stringify(audit.performance)}
@@ -401,7 +636,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const suggestion = await callAI(prompt, settings, "Anda adalah robot audit WordPress. Jawaban Anda harus murni teks tanpa format markdown bold atau header.");
                 aiText.textContent = suggestion;
 
-                // Save to Cache
                 wpData.cache_suggestions = suggestion;
                 saveTabCache(wpData);
 
@@ -416,14 +650,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const baseKeywords = wpData.keywords || [];
         const aiKeywordList = document.getElementById('ai-keyword-list');
 
-        // Add reload button if not already there
+        // Add reload button dynamically
         let refreshBtn = document.getElementById('refresh-ai-keywords');
         if (!refreshBtn) {
-            const header = aiKeywordList.parentElement.previousElementSibling;
-            if (header && header.classList.contains('section-header')) {
-                // Not the right place, keywords are in Keyword Intelligence section
-            }
-            // Let's add it to the label above ai-keyword-list
             const label = aiKeywordList.previousElementSibling;
             if (label && label.classList.contains('label')) {
                 label.style.display = 'flex';
@@ -441,7 +670,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // Check Cache
         if (!force && wpData.cache_keywords) {
             renderAIKeywords(wpData.cache_keywords);
             return;
@@ -457,7 +685,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                // Gunakan ringkasan konten biar saran keyword lebih akurat
                 const articleSnippet = wpData.article ? wpData.article.substring(0, 1000) : "Tidak ada konten artikel terdeteksi.";
                 const prompt = `Analisis URL: ${wpData.url}
                 Keyword asli: ${baseKeywords.join(', ')}
@@ -475,7 +702,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const response = await callAI(prompt, settings, "Anda adalah robot riset keyword SEO. Jawaban Anda HANYA berupa daftar kata kunci dengan label potensi traffic.");
                 const sugKeywords = response.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-                // Save to Cache
                 wpData.cache_keywords = sugKeywords;
                 saveTabCache(wpData);
 
@@ -494,7 +720,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tag = document.createElement('span');
             tag.className = 'keyword-tag ai';
 
-            // Extract Potential Label
             let label = 'low';
             let cleanKeyword = k;
             if (k.toLowerCase().includes('[high]')) {
@@ -514,19 +739,140 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // ==================== INSIGHT BUTTONS ====================
     function initInsightButtons(urlStr) {
-        const url = new URL(urlStr);
-        const domain = url.hostname;
+        try {
+            const url = new URL(urlStr);
+            const domain = url.hostname;
 
-        document.getElementById('check-semrush').onclick = () => {
-            window.open(`https://www.semrush.com/analytics/overview/?q=${domain}`, '_blank');
-        };
+            const semrushBtn = document.getElementById('check-semrush');
+            const ahrefsBtn = document.getElementById('check-ahrefs');
+            const ubersuggestBtn = document.getElementById('check-ubersuggest');
+
+            if (semrushBtn) semrushBtn.onclick = () => window.open(`https://www.semrush.com/analytics/overview/?q=${domain}`, '_blank');
+            if (ahrefsBtn) ahrefsBtn.onclick = () => window.open(`https://ahrefs.com/website-authority-checker/?target=${domain}`, '_blank');
+            if (ubersuggestBtn) ubersuggestBtn.onclick = () => window.open(`https://neilpatel.com/ubersuggest/?q=${domain}&lang=id`, '_blank');
+        } catch(e) {}
     }
 
+    // ==================== SAVE CACHE ====================
     function saveTabCache(wpData) {
         chrome.storage.local.set({ [`tab_${tab.id}`]: wpData });
     }
 
+    // ==================== SETTINGS MODAL ====================
+    const sidePanelBtn = document.getElementById('btn-sidepanel');
+    if (sidePanelBtn) {
+        sidePanelBtn.addEventListener('click', async () => {
+            if (chrome.sidePanel && chrome.sidePanel.open) {
+                const currentWindow = await chrome.windows.getCurrent();
+                chrome.sidePanel.open({ windowId: currentWindow.id });
+            } else {
+                showToast('Fitur Side Panel tidak didukung di browser ini.');
+            }
+        });
+    }
+
+    const settingsBtn = document.getElementById('btn-settings');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettings = document.getElementById('close-settings');
+    const saveSettings = document.getElementById('btn-save-settings');
+
+    const apiInputs = {
+        openai: document.getElementById('api-openai'),
+        modelOpenai: document.getElementById('model-openai'),
+        google: document.getElementById('api-google'),
+        modelGoogle: document.getElementById('model-google'),
+        groq: document.getElementById('api-groq'),
+        modelGroq: document.getElementById('model-groq'),
+        deepseek: document.getElementById('api-deepseek'),
+        modelDeepseek: document.getElementById('model-deepseek'),
+        provider: document.getElementById('ai-provider')
+    };
+
+    settingsBtn.addEventListener('click', () => {
+        chrome.storage.local.get('ai_settings', (data) => {
+            if (data.ai_settings) {
+                const s = data.ai_settings;
+                apiInputs.openai.value = s.openai || '';
+                apiInputs.modelOpenai.value = s.modelOpenai || 'gpt-4o';
+                apiInputs.google.value = s.google || '';
+                apiInputs.modelGoogle.value = s.modelGoogle || 'gemini-1.5-flash';
+                apiInputs.groq.value = s.groq || '';
+                apiInputs.modelGroq.value = s.modelGroq || 'llama-3.1-70b-versatile';
+                apiInputs.deepseek.value = s.deepseek || '';
+                apiInputs.modelDeepseek.value = s.modelDeepseek || 'deepseek-chat';
+                apiInputs.provider.value = s.provider || 'openai';
+            }
+            settingsModal.classList.remove('hidden');
+        });
+    });
+
+    closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+    settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
+
+    saveSettings.addEventListener('click', () => {
+        const settings = {
+            openai: apiInputs.openai.value.trim(),
+            modelOpenai: apiInputs.modelOpenai.value.trim(),
+            google: apiInputs.google.value.trim(),
+            modelGoogle: apiInputs.modelGoogle.value.trim(),
+            groq: apiInputs.groq.value.trim(),
+            modelGroq: apiInputs.modelGroq.value.trim(),
+            deepseek: apiInputs.deepseek.value.trim(),
+            modelDeepseek: apiInputs.modelDeepseek.value.trim(),
+            provider: apiInputs.provider.value
+        };
+
+        chrome.storage.local.set({ ai_settings: settings }, () => {
+            showToast('Pengaturan disimpan!');
+            settingsModal.classList.add('hidden');
+        });
+    });
+
+    // ==================== WHOIS MODAL ====================
+    const whoisBtn = document.getElementById('btn-whois');
+    const whoisModal = document.getElementById('whois-modal');
+    const closeModal = document.getElementById('close-modal');
+
+    whoisBtn.addEventListener('click', () => {
+        whoisModal.classList.remove('hidden');
+        fetchWhois(tab.url);
+    });
+
+    closeModal.addEventListener('click', () => whoisModal.classList.add('hidden'));
+    whoisModal.addEventListener('click', (e) => { if (e.target === whoisModal) whoisModal.classList.add('hidden'); });
+
+    // ==================== COPY HANDLER ====================
+    document.querySelectorAll('.btn-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.getAttribute('data-copy');
+            let textToCopy = '';
+
+            if (type === 'theme') {
+                textToCopy = `Theme: ${themeName.textContent} (v${themeVersion.textContent})`;
+            } else if (type === 'server') {
+                textToCopy = `IP: ${document.getElementById('server-ip').textContent}\nHosting: ${document.getElementById('server-hosting').textContent}\nLokasi: ${document.getElementById('server-location').textContent}`;
+            }
+
+            if (textToCopy) {
+                navigator.clipboard.writeText(textToCopy).then(() => showToast());
+            }
+        });
+    });
+
+    // ==================== TOAST ====================
+    function showToast(message = 'Copied to clipboard!') {
+        toast.textContent = message;
+        toast.classList.remove('hidden');
+        // Reset animation
+        toast.style.animation = 'none';
+        void toast.offsetWidth;
+        toast.style.animation = '';
+        setTimeout(() => toast.classList.add('hidden'), 2200);
+    }
+
+    // ==================== AI CALLER ====================
     async function callAI(prompt, settings, systemMsg = "Anda adalah asisten AI ahli WordPress yang selalu menjawab dalam Bahasa Indonesia yang baik dan benar.") {
         const provider = settings.provider;
         const key = settings[provider];
@@ -539,23 +885,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (provider === 'groq') model = settings.modelGroq || 'llama-3.1-70b-versatile';
         else if (provider === 'deepseek') model = settings.modelDeepseek || 'deepseek-chat';
 
-        let url = "";
-
         const cleanResponse = (text) => {
-            // Remove deepseek/reasoning model <think> tags
             let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '');
-            // Strip all markdown bold (**) and headers (#)
             cleaned = cleaned.replace(/\*\*/g, '').replace(/#/g, '');
             return cleaned.trim();
         };
 
-        if (provider === 'openai') {
-            url = 'https://api.openai.com/v1/chat/completions';
-        } else if (provider === 'groq') {
-            url = 'https://api.groq.com/openai/v1/chat/completions';
-        } else if (provider === 'deepseek') {
-            url = 'https://api.deepseek.com/v1/chat/completions';
-        } else if (provider === 'google') {
+        if (provider === 'google') {
             const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
             const gResp = await fetch(gUrl, {
                 method: 'POST',
@@ -571,6 +907,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return cleanResponse(gData.candidates[0].content.parts[0].text);
         }
+
+        let url = "";
+        if (provider === 'openai') url = 'https://api.openai.com/v1/chat/completions';
+        else if (provider === 'groq') url = 'https://api.groq.com/openai/v1/chat/completions';
+        else if (provider === 'deepseek') url = 'https://api.deepseek.com/v1/chat/completions';
 
         if (url) {
             const response = await fetch(url, {
@@ -597,121 +938,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         throw new Error('Provider tidak dikenali.');
     }
-
-    // Settings Modal Logic
-    const settingsBtn = document.getElementById('btn-settings');
-    const settingsModal = document.getElementById('settings-modal');
-    const closeSettings = document.getElementById('close-settings');
-    const saveSettings = document.getElementById('btn-save-settings');
-
-    const apiInputs = {
-        openai: document.getElementById('api-openai'),
-        modelOpenai: document.getElementById('model-openai'),
-        google: document.getElementById('api-google'),
-        modelGoogle: document.getElementById('model-google'),
-        groq: document.getElementById('api-groq'),
-        modelGroq: document.getElementById('model-groq'),
-        deepseek: document.getElementById('api-deepseek'),
-        modelDeepseek: document.getElementById('model-deepseek'),
-        provider: document.getElementById('ai-provider')
-    };
-
-    settingsBtn.addEventListener('click', () => {
-        // Load existing settings
-        chrome.storage.local.get('ai_settings', (data) => {
-            if (data.ai_settings) {
-                const s = data.ai_settings;
-                apiInputs.openai.value = s.openai || '';
-                apiInputs.modelOpenai.value = s.modelOpenai || 'gpt-4o';
-                apiInputs.google.value = s.google || '';
-                apiInputs.modelGoogle.value = s.modelGoogle || 'gemini-1.5-flash';
-                apiInputs.groq.value = s.groq || '';
-                apiInputs.modelGroq.value = s.modelGroq || 'llama-3.1-70b-versatile';
-                apiInputs.deepseek.value = s.deepseek || '';
-                apiInputs.modelDeepseek.value = s.modelDeepseek || 'deepseek-chat';
-                apiInputs.provider.value = s.provider || 'openai';
-            }
-            settingsModal.classList.remove('hidden');
-        });
-    });
-
-    closeSettings.addEventListener('click', () => {
-        settingsModal.classList.add('hidden');
-    });
-
-    saveSettings.addEventListener('click', () => {
-        const settings = {
-            openai: apiInputs.openai.value.trim(),
-            modelOpenai: apiInputs.modelOpenai.value.trim(),
-            google: apiInputs.google.value.trim(),
-            modelGoogle: apiInputs.modelGoogle.value.trim(),
-            groq: apiInputs.groq.value.trim(),
-            modelGroq: apiInputs.modelGroq.value.trim(),
-            deepseek: apiInputs.deepseek.value.trim(),
-            modelDeepseek: apiInputs.modelDeepseek.value.trim(),
-            provider: apiInputs.provider.value
-        };
-
-        chrome.storage.local.set({ ai_settings: settings }, () => {
-            showToast('Pengaturan disimpan!');
-            settingsModal.classList.add('hidden');
-        });
-    });
-
-    // WHOIS Modal Logic
-    const whoisBtn = document.getElementById('btn-whois');
-    const whoisModal = document.getElementById('whois-modal');
-    const closeModal = document.getElementById('close-modal');
-    const whoisRaw = document.getElementById('whois-raw');
-
-    whoisBtn.addEventListener('click', () => {
-        whoisModal.classList.remove('hidden');
-        fetchWhois(tab.url);
-    });
-
-    closeModal.addEventListener('click', () => {
-        whoisModal.classList.add('hidden');
-    });
-
-    whoisModal.addEventListener('click', (e) => {
-        if (e.target === whoisModal) whoisModal.classList.add('hidden');
-    });
-
-    // Copy Handler
-    document.querySelectorAll('.btn-copy').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const type = btn.getAttribute('data-copy');
-            let textToCopy = '';
-
-            switch (type) {
-                case 'theme':
-                    textToCopy = `Theme: ${themeName.textContent} (v${themeVersion.textContent})`;
-                    break;
-                case 'server':
-                    textToCopy = `IP: ${document.getElementById('server-ip').textContent}\nHosting: ${document.getElementById('server-hosting').textContent}\nLevel: ${document.getElementById('server-location').textContent}`;
-                    break;
-                case 'bank':
-                    textToCopy = document.getElementById('bank-acc').textContent;
-                    break;
-            }
-
-            if (textToCopy) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    showToast();
-                });
-            }
-        });
-    });
-
-    function showToast(message = 'Copied to clipboard!') {
-        toast.textContent = message;
-        toast.classList.remove('hidden');
-        setTimeout(() => {
-            toast.classList.add('hidden');
-        }, 2000);
-    }
 });
 
+// ==================== SERVER INFO ====================
 async function fetchServerInfo(urlStr) {
     try {
         const url = new URL(urlStr);
@@ -725,7 +954,6 @@ async function fetchServerInfo(urlStr) {
             document.getElementById('server-hosting').textContent = data.isp;
             document.getElementById('server-location').textContent = `${data.city}, ${data.country}`;
 
-            // CDN Detection
             const isp = data.isp.toLowerCase();
             const cdnBadge = document.getElementById('cdn-badge');
             const cdns = ['cloudflare', 'sucuri', 'akamai', 'fastly', 'stackpath', 'amazon cloudfront', 'google cloud cdn', 'keycdn', 'bunnycdn', 'imperva'];
@@ -746,6 +974,7 @@ async function fetchServerInfo(urlStr) {
     }
 }
 
+// ==================== NAME SERVERS ====================
 async function fetchNameServers(urlStr) {
     try {
         const url = new URL(urlStr);
@@ -755,7 +984,7 @@ async function fetchNameServers(urlStr) {
         const data = await response.json();
 
         if (data.Answer) {
-            const nsList = data.Answer.map(ans => ans.data).join(', ');
+            const nsList = data.Answer.map(ans => ans.data.replace(/\.$/, '')).join(', ');
             document.getElementById('server-ns').textContent = nsList;
         } else {
             document.getElementById('server-ns').textContent = 'Tidak ditemukan';
@@ -765,6 +994,7 @@ async function fetchNameServers(urlStr) {
     }
 }
 
+// ==================== WHOIS ====================
 async function fetchWhois(urlStr) {
     try {
         const url = new URL(urlStr);
@@ -775,22 +1005,15 @@ async function fetchWhois(urlStr) {
 
         whoisRaw.textContent = `Menganalisis domain ${domain}...`;
 
-        // Strategi RDAP Multi-TLD
-        let rdapUrl = `https://rdap.org/domain/${domain}`; // Default universal redirector
+        let rdapUrl = `https://rdap.org/domain/${domain}`;
 
-        if (tld === 'com') {
-            rdapUrl = `https://rdap.verisign.com/com/v1/domain/${domain}`;
-        } else if (tld === 'net') {
-            rdapUrl = `https://rdap.verisign.com/net/v1/domain/${domain}`;
-        } else if (tld === 'id') {
-            rdapUrl = `https://rdap.pandi.id/rdap/domain/${domain}`;
-        } else if (tld === 'org') {
-            rdapUrl = `https://rdap.publicinterestregistry.net/rdap/v1/domain/${domain}`;
-        }
+        if (tld === 'com') rdapUrl = `https://rdap.verisign.com/com/v1/domain/${domain}`;
+        else if (tld === 'net') rdapUrl = `https://rdap.verisign.com/net/v1/domain/${domain}`;
+        else if (tld === 'id') rdapUrl = `https://rdap.pandi.id/rdap/domain/${domain}`;
+        else if (tld === 'org') rdapUrl = `https://rdap.publicinterestregistry.net/rdap/v1/domain/${domain}`;
 
         const response = await fetch(rdapUrl);
         if (!response.ok) {
-            // If specific registry fails, try the universal one as last resort
             if (!rdapUrl.includes('rdap.org')) {
                 const fallbackResp = await fetch(`https://rdap.org/domain/${domain}`);
                 if (fallbackResp.ok) return handleRdapResponse(await fallbackResp.json());
@@ -814,13 +1037,12 @@ function handleRdapResponse(data) {
 
     if (data.events) {
         data.events.forEach(ev => {
-            const date = new Date(ev.eventDate).toLocaleDateString();
+            const date = new Date(ev.eventDate).toLocaleDateString('id-ID');
             display += `${ev.eventAction}: ${date}\n`;
         });
     }
 
     if (data.entities) {
-        // Find Registrar
         const registrar = data.entities.find(e => e.roles && e.roles.includes('registrar'));
         if (registrar) {
             display += `\nRegistrar: ${registrar.vcardArray?.[1]?.[1]?.[3] || registrar.handle || 'N/A'}\n`;

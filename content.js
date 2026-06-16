@@ -68,9 +68,60 @@
             extractThemeInfo(markers);
             extractPluginInfo(markers);
             extractAuditData(markers);
+            extractSchema(markers);
         }
 
         return markers;
+    }
+
+    function extractSchema(markers) {
+        const schemaTypes = new Set();
+
+        // 1. Detect JSON-LD schema
+        document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+            try {
+                const data = JSON.parse(script.textContent);
+                const findTypes = (obj) => {
+                    if (!obj || typeof obj !== 'object') return;
+                    if (obj['@type']) {
+                        if (Array.isArray(obj['@type'])) {
+                            obj['@type'].forEach(t => schemaTypes.add(t));
+                        } else if (typeof obj['@type'] === 'string') {
+                            schemaTypes.add(obj['@type']);
+                        }
+                    }
+                    if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+                        obj['@graph'].forEach(item => findTypes(item));
+                    }
+                    // Recursively check children
+                    for (const key in obj) {
+                        if (obj.hasOwnProperty(key)) {
+                            findTypes(obj[key]);
+                        }
+                    }
+                };
+                findTypes(data);
+            } catch (e) {
+                // Ignore parse errors
+            }
+        });
+
+        // 2. Detect Microdata
+        document.querySelectorAll('[itemtype]').forEach(el => {
+            const typeAttr = el.getAttribute('itemtype');
+            if (typeAttr) {
+                const match = typeAttr.match(/\/schema\.org\/([A-Za-z]+)/);
+                if (match) {
+                    schemaTypes.add(match[1]);
+                } else {
+                    const parts = typeAttr.split('/');
+                    const lastPart = parts[parts.length - 1];
+                    if (lastPart) schemaTypes.add(lastPart);
+                }
+            }
+        });
+
+        markers.schema = Array.from(schemaTypes);
     }
 
     function extractAuditData(markers) {

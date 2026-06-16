@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-06-17
+### Added
+- **One-click indexing**: Instant deep-links to index page via Google Search Console and Bing Webmaster.
+- **Instant GSC Report**: Open GSC Search Performance report for specific durations (3, 6, 12, or 16 months) in one click.
+- **URL Index Checker**: Verify indexing status of current URL or specific URL in Google and Bing using `site:` query shortcuts.
+- **Schema & Structured Data Detector**: Detect JSON-LD and Microdata schema markup types on active page.
+- **Modern Tab Navigation & Wider Layout**: Tab panels (Overview, SEO Tools, GSC & Bing, Server) in a cleaner 480px wide glassmorphism design.
+
 ## [1.0.5] - 2026-06-15
 ### Changed
 - Updated version to 1.0.5.
