@@ -8,9 +8,15 @@
 
 ## 🎬 Video Dokumentasi
 
-[![WPAudet v1.2.0 - Demo & Tutorial](https://img.youtube.com/vi/r3-TRdoM5bE/maxresdefault.jpg)](https://www.youtube.com/watch?v=r3-TRdoM5bE)
+<div align="center">
 
-> 👆 Klik gambar di atas untuk menonton demo lengkap WPAudet di YouTube.
+[![▶ Tonton Demo WPAudet v1.2.0](https://img.youtube.com/vi/r3-TRdoM5bE/maxresdefault.jpg)](https://www.youtube.com/watch?v=r3-TRdoM5bE)
+
+[![YouTube](https://img.shields.io/badge/▶%20Tonton%20di%20YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=r3-TRdoM5bE)
+
+</div>
+
+> ⚠️ **Catatan**: GitHub tidak mendukung embed video langsung. Klik thumbnail atau tombol di atas untuk menonton di YouTube.
 
 ---
 
