@@ -704,6 +704,19 @@ h2 {
     transform: translateY(-1px);
 }
 
+/* PageSpeed & FB Debugger accent colors */
+.pagespeed-btn:hover {
+    background: linear-gradient(135deg, #e37400, #f5a623) !important;
+    border-color: #e37400 !important;
+    color: white !important;
+}
+
+.fb-debug-btn:hover {
+    background: linear-gradient(135deg, #1877f2, #4196ff) !important;
+    border-color: #1877f2 !important;
+    color: white !important;
+}
+
 /* ==================== AI CONTENT ==================== */
 .ai-box { padding: 5px; }
 

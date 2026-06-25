@@ -831,7 +831,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const url = new URL(urlStr);
             const domain = url.hostname;
+            const fullUrl = urlStr;
 
+            // --- Traffic Insights (domain-based) ---
             const semrushBtn = document.getElementById('check-semrush');
             const ahrefsBtn = document.getElementById('check-ahrefs');
             const ubersuggestBtn = document.getElementById('check-ubersuggest');
@@ -839,6 +841,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (semrushBtn) semrushBtn.onclick = () => window.open(`https://www.semrush.com/analytics/overview/?q=${domain}`, '_blank');
             if (ahrefsBtn) ahrefsBtn.onclick = () => window.open(`https://ahrefs.com/website-authority-checker/?target=${domain}`, '_blank');
             if (ubersuggestBtn) ubersuggestBtn.onclick = () => window.open(`https://neilpatel.com/ubersuggest/?q=${domain}&lang=id`, '_blank');
+
+            // --- Page Analyzer (full URL-based) ---
+            const pagespeedBtn = document.getElementById('check-pagespeed');
+            const fbDebugBtn = document.getElementById('check-fb-debug');
+            const analyzerUrlDisplay = document.getElementById('analyzer-url-display');
+
+            // Show which URL will be analyzed
+            if (analyzerUrlDisplay) {
+                const shortUrl = fullUrl.length > 55 ? fullUrl.substring(0, 55) + '...' : fullUrl;
+                analyzerUrlDisplay.textContent = `🔗 ${shortUrl}`;
+            }
+
+            if (pagespeedBtn) {
+                pagespeedBtn.onclick = () => {
+                    const psiUrl = `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(fullUrl)}&hl=in`;
+                    chrome.tabs.create({ url: psiUrl });
+                    showToast('Membuka PageSpeed Insights...');
+                };
+            }
+
+            if (fbDebugBtn) {
+                fbDebugBtn.onclick = () => {
+                    const fbUrl = `https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(fullUrl)}`;
+                    chrome.tabs.create({ url: fbUrl });
+                    showToast('Membuka Facebook Sharing Debugger...');
+                };
+            }
+
         } catch(e) {}
     }
 
