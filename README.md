@@ -6,6 +6,14 @@
 
 ---
 
+## 🎬 Video Dokumentasi
+
+[![WPAudet v1.2.0 - Demo & Tutorial](https://img.youtube.com/vi/r3-TRdoM5bE/maxresdefault.jpg)](https://www.youtube.com/watch?v=r3-TRdoM5bE)
+
+> 👆 Klik gambar di atas untuk menonton demo lengkap WPAudet di YouTube.
+
+---
+
 ## 🔥 Fitur Lengkap (v1.2.0)
 
 ### 1. Universal Website Detection *(NEW!)*
