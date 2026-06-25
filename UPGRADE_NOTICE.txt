@@ -1,5 +1,27 @@
 === Upgrade Notice ===
 
+= 1.2.0 =
+Major Update: Universal Website Auditor — Sekarang bekerja di SEMUA website, bukan hanya WordPress!
+
+**HIGHLIGHTS:**
+*   **Universal Support**: Audit website apapun — Laravel, Next.js, React, Nuxt.js, Shopify, Blogger, Joomla, HTML biasa, dll.
+*   **Technology Detector**: Menampilkan stack teknologi website yang terdeteksi (kartu baru di tab Overview untuk non-WP).
+*   **Auto Script Injection**: Tidak perlu refresh halaman setelah install/reload ekstensi — analisis berjalan otomatis.
+*   **System Page Detection**: Halaman internal browser (chrome://, edge://) kini ditangani dengan pesan yang jelas.
+*   **WHOIS CORS Fix**: Pesan error yang jelas untuk TLD yang tidak didukung (.io, .co, .xyz, dll) + link cek manual.
+*   **Gemini API Upgrade**: Gunakan field systemInstruction resmi untuk respons AI yang lebih patuh format.
+*   **Perbaikan False Positive**: Deteksi teknologi kini berbasis DOM selector, bukan pencarian teks HTML bebas.
+
+**PENTING UNTUK PENGGUNA LAMA:**
+Update ini mengubah struktur `content.js` dan `background.js` secara signifikan.
+**ANDA HARUS RELOAD EKSTENSI SECARA MANUAL:**
+1. Buka `chrome://extensions/`
+2. Cari WPAudet.
+3. Klik tombol Reload (🔄).
+4. Refresh tab yang ingin dianalisis (atau buka tab baru).
+
+Jika tidak di-reload, ekstensi masih berjalan dengan kode lama dan fitur universal tidak akan aktif.
+
 = 1.0.5 =
 Major Update: Traffic Intelligence & Universal WHOIS.
 This update introduces significant improvements to domain analysis and AI capabilities.

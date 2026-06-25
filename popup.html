@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WPAudet</title>
+    <title>WPAudet v1.2.0</title>
     <link rel="stylesheet" href="popup.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,10 +55,18 @@
                 <p>Menganalisis situs...</p>
             </div>
 
-            <!-- Not WordPress State -->
-            <div id="no-wp" class="state-container hidden">
-                <div class="empty-icon">🔍</div>
-                <p>Bukan situs WordPress</p>
+            <!-- System Page Error State -->
+            <div id="system-page" class="state-container hidden">
+                <div class="empty-icon">🚫</div>
+                <p>Tidak dapat menganalisis halaman sistem browser</p>
+                <small style="color:var(--text-dim);font-size:0.7rem;display:block;margin-top:6px;">(chrome://, edge://, about:, dll)</small>
+            </div>
+
+            <!-- Loading State (Content Script Injection) -->
+            <div id="no-data" class="state-container hidden">
+                <div class="spinner"></div>
+                <p>Memuat data halaman...</p>
+                <small style="color:var(--text-dim);font-size:0.7rem;display:block;margin-top:6px;">Refresh halaman jika proses terlalu lama</small>
             </div>
 
             <!-- Audit Animation Screen -->
@@ -104,8 +112,20 @@
                 <!-- ======================== TAB: OVERVIEW ======================== -->
                 <div class="tab-panel active" id="tab-overview">
 
-                    <!-- Active Theme -->
-                    <section class="info-group">
+                    <!-- Non-WP Technology Info (shown for non-WP sites) -->
+                    <section id="section-technology" class="info-group hidden">
+                        <div class="section-header">
+                            <h2>Teknologi Terdeteksi</h2>
+                        </div>
+                        <div class="card glass-card">
+                            <div id="technology-list" class="plugin-flex">
+                                <!-- Detected technologies injected here -->
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Active Theme (WP only) -->
+                    <section id="section-theme" class="info-group">
                         <div class="section-header">
                             <h2>Tema Aktif</h2>
                             <button class="btn-copy" data-copy="theme" title="Copy Theme Info">
@@ -126,8 +146,8 @@
                         </div>
                     </section>
 
-                    <!-- Plugin List -->
-                    <section class="info-group">
+                    <!-- Plugin List (WP only) -->
+                    <section id="section-plugins" class="info-group">
                         <div class="section-header">
                             <h2>Plugin Terdeteksi (<span id="plugin-count">0</span>)</h2>
                         </div>
@@ -389,7 +409,7 @@
 
         <footer>
             <div class="footer-content">
-                <span>v1.1.0</span>
+                <span>v1.2.0</span>
                 <span class="dot">•</span>
                 <span>Buatan Anak Bangsa</span>
                 <span class="dot">•</span>

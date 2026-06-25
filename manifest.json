@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WPAudet",
-  "version": "1.1.0",
-  "description": "Detects WordPress themes and plugins in real-time. Now with Keyword Traffic Insight features: External Traffic Insights, AI Traffic Potential Estimation, AI Smart Cache, and Stealth Detection.",
+  "version": "1.2.0",
+  "description": "Universal Website Auditor: Audit SEO, Server, Schema & Technology for ANY website. Detects WordPress themes & plugins. Powered by AI. 100% Buatan Anak Bangsa.",
   "permissions": [
     "storage",
     "activeTab",

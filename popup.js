@@ -1,10 +1,19 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const loading = document.getElementById('loading');
-    const noWp = document.getElementById('no-wp');
+    const systemPageEl = document.getElementById('system-page');
+    const noDataEl = document.getElementById('no-data');
     const results = document.getElementById('results');
     const themeName = document.getElementById('theme-name');
     const themeVersion = document.getElementById('theme-version');
     const toast = document.getElementById('toast');
+
+    // System/browser pages that cannot be analyzed
+    const SYSTEM_PAGE_PREFIXES = ['chrome://', 'chrome-extension://', 'edge://', 'about:', 'moz-extension://', 'opera://'];
+
+    function isSystemPage(url) {
+        if (!url) return true;
+        return SYSTEM_PAGE_PREFIXES.some(prefix => url.startsWith(prefix));
+    }
 
     // Get current active tab dynamically
     let tab = null;
@@ -43,25 +52,60 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!tab) return;
 
         // Reset state UI
-        loading.classList.remove('hidden');
-        noWp.classList.add('hidden');
+        loading.classList.add('hidden');
+        systemPageEl.classList.add('hidden');
+        noDataEl.classList.add('hidden');
         results.classList.add('hidden');
         document.getElementById('audit-screen').classList.add('hidden');
 
-        chrome.storage.local.get(`tab_${tab.id}`, async (data) => {
-            let wpData = data[`tab_${tab.id}`];
+        // --- Block system/internal browser pages ---
+        if (isSystemPage(tab.url)) {
+            loading.classList.add('hidden');
+            systemPageEl.classList.remove('hidden');
+            return;
+        }
 
-            if (!wpData || !wpData.isWP) {
+        loading.classList.remove('hidden');
+
+        chrome.storage.local.get(`tab_${tab.id}`, async (storageData) => {
+            let siteData = storageData[`tab_${tab.id}`];
+
+            if (!siteData) {
+                // Try dynamic injection if content script hasn't run yet
                 loading.classList.add('hidden');
-                noWp.classList.remove('hidden');
-                results.classList.add('hidden');
-                // Still init URL display even if not WP
+                noDataEl.classList.remove('hidden');
+
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                    // Wait briefly for message to be processed by background
+                    await new Promise(resolve => setTimeout(resolve, 1200));
+
+                    // Re-fetch from storage after injection
+                    const newData = await new Promise(resolve =>
+                        chrome.storage.local.get(`tab_${tab.id}`, resolve)
+                    );
+                    siteData = newData[`tab_${tab.id}`];
+                } catch (injectErr) {
+                    // Scripting permissions denied (e.g., chrome webstore, etc.)
+                    noDataEl.classList.remove('hidden');
+                    return;
+                }
+
+                noDataEl.classList.add('hidden');
+            } else {
+                loading.classList.add('hidden');
+            }
+
+            if (!siteData) {
+                noDataEl.classList.remove('hidden');
                 initGSCBingPanel(tab.url);
                 return;
             }
 
-            // START AUDIT SEQUENCE
-            loading.classList.add('hidden');
+            // --- START AUDIT SEQUENCE ---
             const auditScreen = document.getElementById('audit-screen');
             auditScreen.classList.remove('hidden');
 
@@ -69,8 +113,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Re-fetch data in case it was updated during the artificial delay
             chrome.storage.local.get(`tab_${tab.id}`, (newData) => {
-                wpData = newData[`tab_${tab.id}`] || wpData;
-                displayResults(wpData);
+                siteData = newData[`tab_${tab.id}`] || siteData;
+                displayResults(siteData);
             });
         });
     }
@@ -114,24 +158,81 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== DISPLAY RESULTS ====================
-    function displayResults(wpData) {
+    function displayResults(siteData) {
         const auditScreen = document.getElementById('audit-screen');
         auditScreen.classList.add('hidden');
-        noWp.classList.add('hidden');
+        noDataEl.classList.add('hidden');
         results.classList.remove('hidden');
 
-        // Theme
-        if (wpData.theme) {
-            themeName.textContent = wpData.theme.name;
-            themeVersion.textContent = wpData.theme.version;
+        const sectionTheme = document.getElementById('section-theme');
+        const sectionPlugins = document.getElementById('section-plugins');
+        const sectionTech = document.getElementById('section-technology');
+
+        if (siteData.isWP) {
+            // --- WordPress Site ---
+            sectionTheme.classList.remove('hidden');
+            sectionPlugins.classList.remove('hidden');
+            sectionTech.classList.add('hidden');
+
+            // Theme
+            if (siteData.theme) {
+                themeName.textContent = siteData.theme.name;
+                themeVersion.textContent = siteData.theme.version;
+            } else {
+                themeName.textContent = 'Custom / Unknown';
+                themeVersion.textContent = 'N/A';
+            }
+
+            // Plugins
+            const pluginList = document.getElementById('plugin-list');
+            const pluginCount = document.getElementById('plugin-count');
+            pluginList.innerHTML = '';
+            pluginCount.textContent = siteData.plugins ? siteData.plugins.length : 0;
+
+            if (siteData.plugins && siteData.plugins.length > 0) {
+                siteData.plugins.forEach(plugin => {
+                    const tag = document.createElement('div');
+                    tag.className = 'plugin-tag';
+                    tag.textContent = plugin.name;
+                    pluginList.appendChild(tag);
+                });
+            } else {
+                const empty = document.createElement('p');
+                empty.className = 'empty-state';
+                empty.textContent = 'Tidak ada plugin yang terdeteksi.';
+                pluginList.appendChild(empty);
+            }
         } else {
-            themeName.textContent = 'Custom / Unknown';
-            themeVersion.textContent = 'N/A';
+            // --- Non-WordPress Site ---
+            sectionTheme.classList.add('hidden');
+            sectionPlugins.classList.add('hidden');
+            sectionTech.classList.remove('hidden');
+
+            // Technology list
+            const techList = document.getElementById('technology-list');
+            techList.innerHTML = '';
+            const techs = siteData.technologies || [];
+            if (techs.length > 0) {
+                techs.forEach(tech => {
+                    const tag = document.createElement('div');
+                    tag.className = 'plugin-tag';
+                    tag.style.background = 'rgba(99, 179, 85, 0.15)';
+                    tag.style.borderColor = 'rgba(99, 179, 85, 0.4)';
+                    tag.style.color = '#8be07a';
+                    tag.textContent = tech;
+                    techList.appendChild(tag);
+                });
+            } else {
+                const empty = document.createElement('p');
+                empty.className = 'empty-state';
+                empty.textContent = 'Teknologi tidak teridentifikasi.';
+                techList.appendChild(empty);
+            }
         }
 
-        // Audit Results
-        if (wpData.audit) {
-            const audit = wpData.audit;
+        // Audit Results (Universal)
+        if (siteData.audit) {
+            const audit = siteData.audit;
 
             const seoEl = document.getElementById('audit-seo-val');
             seoEl.textContent = (audit.seo.hasTitle && audit.seo.hasDesc) ? 'Bagus ✓' : 'Butuh Perbaikan';
@@ -159,28 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Plugins
-        const pluginList = document.getElementById('plugin-list');
-        const pluginCount = document.getElementById('plugin-count');
-        pluginList.innerHTML = '';
-        pluginCount.textContent = wpData.plugins.length;
-
-        if (wpData.plugins.length > 0) {
-            wpData.plugins.forEach(plugin => {
-                const tag = document.createElement('div');
-                tag.className = 'plugin-tag';
-                tag.textContent = plugin.name;
-                pluginList.appendChild(tag);
-            });
-        } else {
-            const empty = document.createElement('p');
-            empty.className = 'empty-state';
-            empty.textContent = 'Tidak ada plugin yang terdeteksi.';
-            pluginList.appendChild(empty);
-        }
-
         // Schema
-        renderSchemaResult(wpData.schema);
+        renderSchemaResult(siteData.schema);
 
         // Keywords
         const keywordList = document.getElementById('keyword-list');
@@ -188,30 +269,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         keywordList.innerHTML = '';
         aiKeywordList.innerHTML = '';
 
-        if (wpData.keywords && wpData.keywords.length > 0) {
-            wpData.keywords.forEach(kw => {
+        if (siteData.keywords && siteData.keywords.length > 0) {
+            siteData.keywords.forEach(kw => {
                 const tag = document.createElement('span');
                 tag.className = 'keyword-tag';
                 tag.textContent = kw;
                 keywordList.appendChild(tag);
             });
-            getAIKeywords(wpData);
+            getAIKeywords(siteData);
         } else {
             keywordList.innerHTML = '<p class="empty-state">Tidak ada keyword terdeteksi.</p>';
         }
 
         // Store current article for rewriter
-        window.currentArticle = wpData.article;
+        window.currentArticle = siteData.article;
 
         // Check for cached rewrite
-        if (wpData.cache_rewrite) {
+        if (siteData.cache_rewrite) {
             rewriterResult.classList.remove('hidden');
-            const parts = wpData.cache_rewrite.split('---');
+            const parts = siteData.cache_rewrite.split('---');
             if (parts.length > 1) {
                 rewriteTitle.textContent = parts[0].replace(/JUDUL:/i, '').trim();
                 rewriteBody.textContent = parts[1].replace(/ISI:/i, '').trim();
             } else {
-                rewriteBody.textContent = wpData.cache_rewrite;
+                rewriteBody.textContent = siteData.cache_rewrite;
             }
         } else {
             rewriterResult.classList.add('hidden');
@@ -492,11 +573,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     auditBtn.addEventListener('click', () => {
         chrome.storage.local.get(`tab_${tab.id}`, (data) => {
-            const wpData = data[`tab_${tab.id}`];
-            if (wpData && wpData.audit) {
-                populateAuditModal(wpData.audit);
+            const siteData = data[`tab_${tab.id}`];
+            if (siteData && siteData.audit) {
+                populateAuditModal(siteData);
                 auditModal.classList.remove('hidden');
-                getAISuggestions(wpData);
+                getAISuggestions(siteData);
             }
         });
     });
@@ -504,7 +585,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeAuditModal.addEventListener('click', () => auditModal.classList.add('hidden'));
     auditModal.addEventListener('click', (e) => { if (e.target === auditModal) auditModal.classList.add('hidden'); });
 
-    function populateAuditModal(audit) {
+    function populateAuditModal(siteData) {
+        const audit = siteData.audit;
         auditBody.innerHTML = `
             <div class="audit-detail-item">
                 <h4>SEO Health</h4>
@@ -590,20 +672,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('refresh-ai-audit').addEventListener('click', () => {
             chrome.storage.local.get(`tab_${tab.id}`, (data) => {
-                const wpData = data[`tab_${tab.id}`];
-                if (wpData) getAISuggestions(wpData, true);
+                const siteData = data[`tab_${tab.id}`];
+                if (siteData) getAISuggestions(siteData, true);
             });
         });
     }
 
     // ==================== AI FUNCTIONS ====================
-    async function getAISuggestions(wpData, force = false) {
-        const audit = wpData.audit;
+    async function getAISuggestions(siteData, force = false) {
+        const audit = siteData.audit;
         const aiText = document.getElementById('ai-audit-text');
         if (!aiText) return;
 
-        if (!force && wpData.cache_suggestions) {
-            aiText.textContent = wpData.cache_suggestions;
+        if (!force && siteData.cache_suggestions) {
+            aiText.textContent = siteData.cache_suggestions;
             aiText.classList.remove('loading-text');
             return;
         }
@@ -620,12 +702,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                const prompt = `Analisis audit WordPress URL: ${wpData.url}.
+                const isWP = siteData.isWP ? 'WordPress' : 'Non-WordPress';
+                const technologies = siteData.technologies && siteData.technologies.length
+                    ? siteData.technologies.join(', ') : '-';
+
+                const prompt = `Analisis audit website URL: ${siteData.url}.
+                Platform: ${isWP}${!siteData.isWP ? ` | Teknologi: ${technologies}` : ''}
                 Data Audit:
                 SEO: ${JSON.stringify(audit.seo)}
                 Performa: ${JSON.stringify(audit.performance)}
                 Security: ${JSON.stringify(audit.security)}
-                Keyword: ${wpData.keywords ? wpData.keywords.join(', ') : '-'}
+                Keyword: ${siteData.keywords ? siteData.keywords.join(', ') : '-'}
 
                 TUGAS: Berikan 3 saran perbaikan teknis yang TO THE POINT dalam Bahasa Indonesia. 
                 ATURAN FORMAT: 
@@ -633,11 +720,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 - JANGAN berikan teks analisis atau penjelasan panjang.
                 - LANGSUNG ke poin perbaikan (1, 2, 3).`;
 
-                const suggestion = await callAI(prompt, settings, "Anda adalah robot audit WordPress. Jawaban Anda harus murni teks tanpa format markdown bold atau header.");
+                const suggestion = await callAI(prompt, settings, "Anda adalah robot audit website profesional. Jawaban Anda harus murni teks tanpa format markdown bold atau header.");
                 aiText.textContent = suggestion;
 
-                wpData.cache_suggestions = suggestion;
-                saveTabCache(wpData);
+                siteData.cache_suggestions = suggestion;
+                saveTabCache(siteData);
 
             } catch (error) {
                 aiText.textContent = 'Gagal mengambil saran AI: ' + error.message;
@@ -646,8 +733,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    async function getAIKeywords(wpData, force = false) {
-        const baseKeywords = wpData.keywords || [];
+    async function getAIKeywords(siteData, force = false) {
+        const baseKeywords = siteData.keywords || [];
         const aiKeywordList = document.getElementById('ai-keyword-list');
 
         // Add reload button dynamically
@@ -666,12 +753,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </svg>
                     </button>`;
                 refreshBtn = document.getElementById('refresh-ai-keywords');
-                refreshBtn.addEventListener('click', () => getAIKeywords(wpData, true));
+                refreshBtn.addEventListener('click', () => getAIKeywords(siteData, true));
             }
         }
 
-        if (!force && wpData.cache_keywords) {
-            renderAIKeywords(wpData.cache_keywords);
+        if (!force && siteData.cache_keywords) {
+            renderAIKeywords(siteData.cache_keywords);
             return;
         }
 
@@ -685,8 +772,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                const articleSnippet = wpData.article ? wpData.article.substring(0, 1000) : "Tidak ada konten artikel terdeteksi.";
-                const prompt = `Analisis URL: ${wpData.url}
+                const articleSnippet = siteData.article ? siteData.article.substring(0, 1000) : "Tidak ada konten artikel terdeteksi.";
+                const prompt = `Analisis URL: ${siteData.url}
                 Keyword asli: ${baseKeywords.join(', ')}
                 Potongan Konten: ${articleSnippet}
 
@@ -702,8 +789,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const response = await callAI(prompt, settings, "Anda adalah robot riset keyword SEO. Jawaban Anda HANYA berupa daftar kata kunci dengan label potensi traffic.");
                 const sugKeywords = response.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-                wpData.cache_keywords = sugKeywords;
-                saveTabCache(wpData);
+                siteData.cache_keywords = sugKeywords;
+                saveTabCache(siteData);
 
                 renderAIKeywords(sugKeywords);
             } catch (error) {
@@ -873,7 +960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== AI CALLER ====================
-    async function callAI(prompt, settings, systemMsg = "Anda adalah asisten AI ahli WordPress yang selalu menjawab dalam Bahasa Indonesia yang baik dan benar.") {
+    async function callAI(prompt, settings, systemMsg = "Anda adalah asisten AI ahli website yang selalu menjawab dalam Bahasa Indonesia yang baik dan benar.") {
         const provider = settings.provider;
         const key = settings[provider];
 
@@ -887,7 +974,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const cleanResponse = (text) => {
             let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '');
-            cleaned = cleaned.replace(/\*\*/g, '').replace(/#/g, '');
+            cleaned = cleaned.replace(/\*\*/g, '').replace(/#+\s*/g, '').replace(/^-\s+/gm, '');
             return cleaned.trim();
         };
 
@@ -897,9 +984,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: `${systemMsg}\n\n${prompt}` }] }]
+                    systemInstruction: { parts: [{ text: systemMsg }] },
+                    contents: [{ parts: [{ text: prompt }] }]
                 })
             });
+            if (!gResp.ok) {
+                const errText = await gResp.text();
+                throw new Error(`Gemini API Error (${gResp.status}): ${errText.substring(0, 120)}`);
+            }
             const gData = await gResp.json();
             if (gData.error) throw new Error(gData.error.message || 'Gemini API Error');
             if (!gData.candidates || !gData.candidates[0]?.content?.parts?.[0]?.text) {
@@ -928,6 +1020,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 })
             });
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`API Error (${response.status}): ${errText.substring(0, 120)}`);
+            }
             const data = await response.json();
             if (data.error) throw new Error(data.error.message || 'API Error');
             if (!data.choices || !data.choices[0]?.message?.content) {
@@ -996,29 +1092,42 @@ async function fetchNameServers(urlStr) {
 
 // ==================== WHOIS ====================
 async function fetchWhois(urlStr) {
+    const whoisRaw = document.getElementById('whois-raw');
+    if (!whoisRaw) return;
+
     try {
         const url = new URL(urlStr);
         const domain = url.hostname.replace(/^www\./, '');
-        const whoisRaw = document.getElementById('whois-raw');
         const parts = domain.split('.');
         const tld = parts[parts.length - 1].toLowerCase();
 
         whoisRaw.textContent = `Menganalisis domain ${domain}...`;
 
-        let rdapUrl = `https://rdap.org/domain/${domain}`;
+        // Only supported TLDs with declared host_permissions in manifest
+        const supportedTLDs = { com: true, net: true, id: true, org: true };
 
+        let rdapUrl;
         if (tld === 'com') rdapUrl = `https://rdap.verisign.com/com/v1/domain/${domain}`;
         else if (tld === 'net') rdapUrl = `https://rdap.verisign.com/net/v1/domain/${domain}`;
         else if (tld === 'id') rdapUrl = `https://rdap.pandi.id/rdap/domain/${domain}`;
         else if (tld === 'org') rdapUrl = `https://rdap.publicinterestregistry.net/rdap/v1/domain/${domain}`;
+        else {
+            // Unsupported TLD: rdap.org will redirect to an external RDAP server
+            // which is blocked by Manifest V3 CORS. Inform user clearly.
+            whoisRaw.textContent = `TLD ".${tld}" tidak didukung langsung.\n\nWHOIS data hanya tersedia untuk domain .com, .net, .org, dan .id karena keterbatasan CORS pada ekstensi browser.\n\nCoba cek manual di: https://who.is/whois/${domain}`;
+            return;
+        }
 
-        const response = await fetch(rdapUrl);
+        let response;
+        try {
+            response = await fetch(rdapUrl);
+        } catch (networkErr) {
+            whoisRaw.textContent = `Gagal terhubung ke server RDAP.\n\nKemungkinan penyebab:\n- Koneksi internet bermasalah\n- Server RDAP tidak merespons\n\nCoba cek manual di: https://who.is/whois/${domain}`;
+            return;
+        }
+
         if (!response.ok) {
-            if (!rdapUrl.includes('rdap.org')) {
-                const fallbackResp = await fetch(`https://rdap.org/domain/${domain}`);
-                if (fallbackResp.ok) return handleRdapResponse(await fallbackResp.json());
-            }
-            whoisRaw.textContent = `Gagal mengambil data WHOIS (Error: ${response.status}).\n\nMungkin domain ini menggunakan TLD yang belum didukung RDAP secara publik.`;
+            whoisRaw.textContent = `Gagal mengambil data WHOIS (HTTP ${response.status}).\n\nDomain mungkin tidak terdaftar atau server RDAP sedang bermasalah.\n\nCoba cek manual di: https://who.is/whois/${domain}`;
             return;
         }
 
@@ -1026,9 +1135,12 @@ async function fetchWhois(urlStr) {
         handleRdapResponse(data);
 
     } catch (error) {
-        document.getElementById('whois-raw').textContent = 'Error: Link RDAP tidak merespons atau domain tidak valid.';
+        if (whoisRaw) {
+            whoisRaw.textContent = `Error: Domain tidak valid atau terjadi kesalahan tak terduga.\n\n(${error.message})`;
+        }
     }
 }
+
 
 function handleRdapResponse(data) {
     const whoisRaw = document.getElementById('whois-raw');
