@@ -98,5 +98,5 @@ Aplikasi ini gratis dan Open Source. Dukungan Anda di Trakteer sangat berarti un
 ---
 
 ### WPAudet: Karena Semua Website Bagus Pantas untuk Dibedah.
-*Versi 1.2.0 | Dibuat dengan ❤ oleh BUNGRAHMAN di Indonesia*
+*Version 1.2.0 | Made with ❤ by BUNGRAHMAN*
 
