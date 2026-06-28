@@ -1,7 +1,5 @@
 # WPAudet: Universal Website Auditor — Bongkar Rahasia Semua Website!
 
-> **Extension detektif paling estetik, canggih, dan 100% Buatan Anak Bangsa.** 🇮🇩
-
 **WPAudet** adalah Chrome Extension all-in-one untuk Developer, SEO Specialist, dan Marketer yang ingin membedah teknologi **semua jenis website** secara real-time. Bukan hanya WordPress — tapi juga Laravel, Next.js, Blogger, Shopify, Joomla, dan website HTML biasa pun bisa diaudit. Ditenagai oleh AI dan tools monitoring profesional.
 
 ---
